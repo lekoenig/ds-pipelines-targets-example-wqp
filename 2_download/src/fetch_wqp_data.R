@@ -270,3 +270,61 @@ fetch_wqp_data <- function(site_counts_grouped, char_names, wqp_args = NULL,
   return(wqp_data_out)
 }
 
+
+
+#' @title Download data from the Water Quality Portal and save as a feather file.
+#' 
+#' @description 
+#' Function to pull WQP data given a dataset of site ids and/or site coordinates.
+#' The downloaded data will be saved as either a .rds file or a .feather file 
+#' depending on the entry for `fileout`.
+#'  
+#' @param fileout character string indicating the name of the output file, 
+#' including file path and extension. Accepted file extensions include
+#' .rds or .feather.
+#' @param site_counts_grouped data frame containing a row for each site. Columns 
+#' contain the site identifiers, the total number of records, and an assigned
+#' download group. Must contain columns `site_id` and `pull_by_id`, where
+#' `pull_by_id` is logical and indicates whether data should be downloaded
+#' using the site identifier or by querying a small bounding box around the site.
+#' @param char_names vector of character strings indicating which WQP 
+#' characteristic names to query.
+#' @param wqp_args list containing additional arguments to pass to whatWQPdata(),
+#' defaults to NULL. See https://www.waterqualitydata.us/webservices_documentation 
+#' for more information.  
+#' @param max_tries integer, maximum number of attempts if the data download 
+#' step returns an error. Defaults to 3.
+#' @param verbose logical, indicates whether messages from {dataRetrieval} should 
+#' be printed to the console in the event that a query returns no data. Defaults 
+#' to FALSE. Note that `verbose` only handles messages, and {dataRetrieval} errors 
+#' or warnings will still get passed up to `fetch_wqp_data`. 
+#' 
+#' @returns
+#' Returns an output file (.rds or .feather) containing data downloaded from the 
+#' Water Quality Portal, where each row represents a unique data record.
+#' 
+fetch_and_save_wqp_data <- function(fileout, site_counts_grouped, char_names,
+                                    wqp_args = NULL, max_tries = 3, verbose = FALSE){
+  
+  # Download data
+  wqp_data <- fetch_wqp_data(site_counts_grouped, 
+                             char_names,
+                             wqp_args, 
+                             max_tries, 
+                             verbose)
+  
+  # write data to .rds or .feather file
+  if(!grepl(".rds|.feather", fileout)){
+    stop("Cannot save data file. Check that fileout has extension .rds or .feather.")
+  } else {
+    if(grepl(".rds", fileout)){
+      saveRDS(wqp_data, fileout)
+    }
+    if(grepl(".feather", fileout)){
+      arrow::write_feather(wqp_data, fileout)
+    }
+  }
+
+  return(fileout)
+}
+

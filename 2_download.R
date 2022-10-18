@@ -24,25 +24,37 @@ p2_targets_list <- list(
     iteration = "group"
   ),
   
-  # Map over groups of sites to download data.
-  # Note that because error = 'continue', {targets} will attempt to build all 
-  # of the "branches" represented by each unique combination of characteristic 
-  # name and download group, even if one branch returns an error. This way, 
-  # we will not need to re-build branches that have already run successfully. 
-  # However, if a branch fails, {targets} will throw an error reading `could
-  # not load dependencies of [immediate downstream target]. invalid 'description'
-  # argument` because it cannot merge the individual branches and so did not  
-  # complete the branching target. The error(s) associated with the failed branch 
-  # will therefore need to be resolved before the full target can be successfully 
-  # built. A common reason a branch may fail is due to WQP timeout errors. Timeout 
-  # errors can sometimes be resolved by waiting a few hours and retrying tar_make().
+  # Map over groups of sites to download data, and save data for each group
+  # to an rds file. Note that because error = 'continue', {targets} will 
+  # attempt to build all of the "branches" represented by each unique 
+  # combination of characteristic name and download group, even if one branch
+  # returns an error. This way, we will not need to re-build branches that have
+  # already run successfully. However, if a branch fails, {targets} will throw an 
+  # error reading `could not load dependencies of [immediate downstream target].
+  # invalid 'description' argument` because it cannot merge the individual 
+  # branches and so did not complete the branching target. The error(s) associated
+  # with the failed branch will therefore need to be resolved before the full 
+  # target can be successfully built. A common reason a branch may fail is due
+  # to WQP timeout errors. Timeout errors can sometimes be resolved by waiting
+  # a few hours and retrying tar_make().
   tar_target(
-    p2_wqp_data_aoi,
-    fetch_wqp_data(p2_site_counts_grouped, 
-                   char_names = unique(p2_site_counts_grouped$CharacteristicName), 
-                   wqp_args = wqp_args),
+    p2_wqp_data_aoi_rds,
+    fetch_and_save_wqp_data(
+      fileout = sprintf("2_download/tmp/wqp_data_grp_%s.rds",
+                        unique(p2_site_counts_grouped$tar_group)), 
+      site_counts_grouped = p2_site_counts_grouped, 
+      char_names = unique(p2_site_counts_grouped$CharacteristicName),
+      wqp_args = wqp_args),
     pattern = map(p2_site_counts_grouped),
+    format = "file",
     error = "continue"
+  ),
+
+  # Combine individual branch files containing WQP data into a single data frame
+  tar_target(
+    p2_wqp_data_aoi, 
+    purrr::map_dfr(p2_wqp_data_aoi_rds, function(fn){
+      readRDS(fn)})
   ),
   
   # Summarize the data downloaded from the WQP
